@@ -1,25 +1,38 @@
 # client.py
-import hashpumpy
-from server import verify
+import hashlib
+import struct
+
+# Helper to generate MD5 padding
+def md5_padding(msg_len: int):
+    padding = b'\x80'  # 0x80 = 10000000 (bit 1 followed by zeros)
+    padding += b'\x00' * ((56 - (msg_len + 1) % 64) % 64)
+    padding += struct.pack('<Q', msg_len * 8)  # 64-bit little-endian
+    return padding
 
 def perform_attack():
-    intercepted_message = b"amount=100&to=alice"
-    intercepted_mac = "614d28d808af46d3702fe35fae67267c"
-    data_to_append = b"&admin=true"
+    # Intercepted values
+    original_message = b"amount=100&to=alice"
+    original_mac = "614d28d808af46d3702fe35fae67267c"  # taken from vulnerable server
+    append_data = b"&admin=true"
 
-    # Try multiple key lengths (assume between 8 and 20)
-    for key_length in range(8, 21):
-        new_mac, new_message = hashpumpy.hashpump(intercepted_mac, intercepted_message.decode(), data_to_append.decode(), key_length)
-        forged_message = new_message.encode()
-        forged_mac = new_mac
+    print("=== Length Extension Attack (Simulated) ===")
 
-        if verify(forged_message, forged_mac):
-            print("SUCCESS: Server accepted the forged message!")
-            print("Forged message:", forged_message)
-            print("Forged MAC:", forged_mac)
-            return
+    for key_len in range(8, 17):  # reasonable guess: 8–16 bytes
+        # Step 1: Generate padding as the hash function would do
+        padding = md5_padding(len(original_message) + key_len)
 
-    print("Attack failed. Try increasing key length range.")
+        # Step 2: Forge message
+        forged_message = original_message + padding + append_data
+
+        print(f"\n[+] Trying with key length = {key_len}")
+        print(f"Forged message (raw): {forged_message}")
+        print(f"Forged message (hex): {forged_message.hex()}")
+
+        print(f"Use the original MAC: {original_mac}")
+        print("Send forged message + original MAC to the vulnerable server.")
+
+        # Stop after one example (you can loop through all)
+        break
 
 if __name__ == "__main__":
     perform_attack()
