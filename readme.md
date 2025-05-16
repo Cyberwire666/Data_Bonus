@@ -1,64 +1,111 @@
-MAC FORGERY DEMO - HOW TO RUN
-=============================
+# MAC Forgery Attack Demonstration and Mitigation
 
-This project demonstrates how a naive MAC implementation using MD5 is vulnerable
-to a length extension attack, and how to securely mitigate it using HMAC.
+## Overview
+This project demonstrates a **length extension attack** against a naive hash-based MAC implementation and shows the secure HMAC alternative.
 
----------------------------------------------
-🛠 REQUIREMENTS
----------------------------------------------
-- Python 3.x
-- No additional libraries needed (uses built-in `hashlib`, `hmac`, `struct`)
+## Files
 
----------------------------------------------
-📁 FILES INCLUDED
----------------------------------------------
-1. server.py           # Naive MAC implementation (vulnerable)
-2. client.py           # Simulates MAC forgery using padding
-3. secure_server.py    # Secure implementation using HMAC
+### 1. Insecure Server (`server.py`)
+```python
+import hashlib
 
----------------------------------------------
-▶️ HOW TO RUN
----------------------------------------------
+SECRET_KEY = b'supersecretkey'
 
-1. Run the vulnerable server simulation:
-   -------------------------------------
-   $ python3 server.py
+def generate_mac(message: bytes) -> str:
+    return hashlib.md5(SECRET_KEY + message).hexdigest()
 
-   You will see the MAC generated for a normal message,
-   and a failed attempt to verify a forged message.
+def verify(message: bytes, mac: str) -> bool:
+    return mac == generate_mac(message)
+```
+### 2. Attacker (client.py)
+```python
+import hashpumpy
+import server
 
-2. Run the simulated attack:
-   --------------------------
-   $ python3 client.py
+def perform_attack():
+    intercepted_message = b"amount=100&to=alice"
+    intercepted_mac = server.generate_mac(intercepted_message)
+    data_to_append = b"&admin=true"
 
-   This simulates how an attacker would craft a forged message using MD5 padding
-   and reuse the original MAC.
+    for key_length in range(8, 17):
+        forged_mac, forged_message = hashpumpy.hashpump(
+            intercepted_mac,
+            intercepted_message.decode(),
+            data_to_append.decode(),
+            key_length
+        )
+        if server.verify(forged_message.encode(), forged_mac):
+            print("✅ Attack successful!")
+            return forged_message.encode(), forged_mac
+```
+### 3. Secure Server (secure_server.py)
+```python
+import hmac
+import hashlib
 
-3. Run the secure server simulation:
-   ---------------------------------
-   $ python3 secure_server.py
+SECRET_KEY = b'supersecretkey'
 
-   This uses HMAC (Hash-based Message Authentication Code).
-   Forged messages will fail validation — showing the correct way to handle MACs.
+def generate_hmac(message: bytes) -> str:
+    return hmac.new(SECRET_KEY, message, hashlib.sha256).hexdigest()
 
----------------------------------------------
-📝 NOTES
----------------------------------------------
-- If you want to test other key lengths in `client.py`, edit the range in:
-    for key_len in range(8, 17):
-- Make sure all files are in the same directory before running them.
+def verify(message: bytes, mac: str) -> bool:
+    return hmac.compare_digest(generate_hmac(message), mac)
+```
+### How to Run
+### Install dependencies:
 
----------------------------------------------
-✅ EXPECTED OUTPUT
----------------------------------------------
-- server.py: Shows a successful MAC generation and a failed verification for forged message.
-- client.py: Constructs a forged message and attempts to trick the server.
-- secure_server.py: Rejects the forged message securely using HMAC.
+```bash
+pip install hashpumpy
+```
+### Test the insecure implementation:
 
----------------------------------------------
-🔐 SECURITY LESSON
----------------------------------------------
-Never use plain hash(secret + message) for authentication.
-Use HMAC instead: hmac.new(key, message, hashlib.md5 or sha256).hexdigest()
+```bash
+python server.py
+python client.py  # Will show successful attack
+```
+### Test the secure implementation:
 
+```bash
+python secure_server.py
+python client.py  # Will show failed attack
+```
+### Expected Outputs
+
+=== Insecure Server ===
+```bash
+Original message: amount=100&to=alice
+MAC: 614d28d808af46d3702fe35fae67267c
+```
+✅ Attack successful!
+```bash
+Forged message: b'amount=100&to=alice\x80...&admin=true'
+```
+
+
+=== Secure Server ===
+```bash
+Original message: amount=100&to=alice
+HMAC: 9a83ddf5e5d49a9a...
+```
+❌ Attack failed (expected with HMAC)
+
+### Technical Explanation
+### Why the Attack Works
+MD5 processes messages in blocks
+Final MAC represents internal hash state
+Attacker can continue hashing from this state
+
+### Why HMAC Prevents It
+Uses key mixing: hash(key ⊕ opad || hash(key ⊕ ipad || message))
+Inner hash destroys length extension property   
+Mathematically proven secure construction
+
+### Team
+Yehia Tarek
+Sara Ahmed
+Shadwa Ahmed
+
+### Course
+Data Integrity and Authentication
+### Submission Date
+May 16, 2023
