@@ -101,8 +101,8 @@ Inner hash destroys length extension property
 Mathematically proven secure construction
 
 ### Team
-Yehia Tarek
-Sara Ahmed
+Yehia Tarek -
+Sara Ahmed -
 Shadwa Ahmed
 
 ### Course
